@@ -12,6 +12,9 @@
 # VS Code settings
 .vscode/
 
+# VS
+.vs/
+
 # Rider settings
 .idea/
 
