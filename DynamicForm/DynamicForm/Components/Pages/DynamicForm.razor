@@ -1,0 +1,336 @@
+﻿@using DynamicForm.Models
+@using DynamicForm.Services
+@using System.Linq.Expressions
+@using Microsoft.AspNetCore.Components.Rendering
+@typeparam TItem
+@inherits OwningComponentBase<FormService>
+
+<EditForm Model="@FormData" OnValidSubmit="@HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    @foreach (var field in FormDefinition.Fields)
+    {
+        @if (!field.IsHidden)
+        {
+            <div class="form-group" style="@(field.IsHidden ? "display:none;" : "")">
+                @RenderField(field)
+            </div>
+        }
+    }
+
+    <button type="submit" class="btn btn-primary">Submit</button>
+</EditForm>
+
+@code {
+    [Parameter] public FormDefinition FormDefinition { get; set; }
+    [Parameter] public TItem FormData { get; set; }
+    [Parameter] public EventCallback<TItem> OnValidSubmit { get; set; }
+    //[Parameter] public EventCallback<Dictionary<string, object>> OnValidSubmit { get; set; }
+
+    private Dictionary<string, object> FormValues = new();
+
+    protected override void OnInitialized()
+    {
+        // Initialize form values from FormData or defaults
+        foreach (var field in FormDefinition.Fields)
+        {
+            if (!FormValues.ContainsKey(field.Name))
+            {
+                FormValues[field.Name] = field.DefaultValue ?? GetDefaultValue(field.Type);
+            }
+        }
+    }
+
+    private object GetDefaultValue(FieldType type)
+    {
+        return type switch
+        {
+            FieldType.Number => 0,
+            FieldType.Checkbox => false,
+            FieldType.Date => DateTime.Today,
+            _ => string.Empty
+        };
+    }
+
+    private RenderFragment RenderField(FormField field) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "form-field");
+
+        // Label
+        builder.OpenElement(2, "label");
+        builder.AddContent(3, field.Label);
+        if (field.IsRequired)
+        {
+            builder.AddContent(4, " *");
+        }
+        builder.CloseElement();
+
+        // Input control
+        switch (field.Type)
+        {
+            case FieldType.Text:
+                RenderTextInput(builder, field);
+                break;
+            case FieldType.Number:
+                RenderNumberInput(builder, field);
+                break;
+            case FieldType.DropDown:
+                RenderDropdown(builder, field);
+                break;
+            case FieldType.Checkbox:
+                RenderCheckbox(builder, field);
+                break;
+            case FieldType.Date:
+                RenderDateInput(builder, field);
+                break;
+        }
+
+        // Validation message
+        builder.OpenComponent<ValidationMessage<string>>(100);
+        builder.AddAttribute(101, "For",
+            GetValidationForExpression(field));
+        builder.CloseComponent();
+
+        builder.CloseElement();
+    };
+
+    private Expression<Func<string>> GetValidationForExpression(FormField field)
+    {
+        if (FormData is Dictionary<string, object>)
+        {
+            // Handle dictionary case
+            return Expression.Lambda<Func<string>>(
+                    Expression.Constant(FormValues[field.Name]?.ToString(), typeof(string))
+            );
+        }
+        else
+        {
+            // Handle strongly-typed model case
+            return Expression.Lambda<Func<string>>(
+                Expression.Property(
+                    Expression.Constant(FormData), field.Name));
+        }
+    }
+
+    private void RenderTextInput(RenderTreeBuilder builder, FormField field)
+    {
+        builder.OpenComponent<InputText>(10);
+        builder.AddAttribute(11, "Value", FormValues[field.Name]?.ToString());
+        builder.AddAttribute(12, "ValueChanged",
+            EventCallback.Factory.Create<string>(
+                this, value => HandleValueChanged(field, value)));
+        builder.AddAttribute(13, "ValueExpression",
+            GetValueExpression(field));
+        builder.AddAttribute(14, "Disabled", field.IsReadonly);
+        builder.CloseComponent();
+    }
+
+    private void RenderNumberInput(RenderTreeBuilder builder, FormField field)
+    {
+        builder.OpenComponent<InputNumber<int>>(20);
+        builder.AddAttribute(21, "Value",
+            int.TryParse(FormValues[field.Name]?.ToString(), out var num) ? num : 0);
+        builder.AddAttribute(22, "ValueChanged",
+            EventCallback.Factory.Create<int>(
+                this, value => HandleValueChanged(field, value)));
+        builder.AddAttribute(23, "ValueExpression",
+            GetValueExpression(field));
+        builder.AddAttribute(24, "Disabled", field.IsReadonly);
+        builder.CloseComponent();
+    }
+
+    private void RenderDropdown(RenderTreeBuilder builder, FormField field)
+    {
+        builder.OpenComponent<InputSelect<string>>(30);
+        builder.AddAttribute(31, "Value", FormValues[field.Name]?.ToString());
+        builder.AddAttribute(32, "ValueChanged",
+            EventCallback.Factory.Create<string>(
+                this, value => HandleValueChanged(field, value)));
+        builder.AddAttribute(33, "ValueExpression",
+            GetValueExpression(field));
+        builder.AddAttribute(34, "Disabled", field.IsReadonly);
+        builder.AddAttribute(35, "ChildContent", (RenderFragment)(selectBuilder =>
+        {
+            foreach (var item in field.Data)
+            {
+                selectBuilder.OpenElement(0, "option");
+                selectBuilder.AddAttribute(1, "value", item.Value);
+                selectBuilder.AddContent(2, item.Text);
+                selectBuilder.CloseElement();
+            }
+        }));
+        builder.CloseComponent();
+    }
+
+    private void RenderCheckbox(RenderTreeBuilder builder, FormField field)
+    {
+        builder.OpenComponent<InputCheckbox>(40);
+        builder.AddAttribute(41, "Value",
+            Convert.ToBoolean(FormValues[field.Name]));
+        builder.AddAttribute(42, "ValueChanged",
+            EventCallback.Factory.Create<bool>(
+                this, value => HandleValueChanged(field, value)));
+        builder.AddAttribute(43, "ValueExpression",
+            GetValueExpression(field));
+        builder.AddAttribute(44, "Disabled", field.IsReadonly);
+        builder.CloseComponent();
+    }
+
+    private void RenderDateInput(RenderTreeBuilder builder, FormField field)
+    {
+        builder.OpenComponent<InputDate<DateTime>>(50);
+        builder.AddAttribute(51, "Value",
+            DateTime.TryParse(FormValues[field.Name]?.ToString(), out var date) ? date : DateTime.Today);
+        builder.AddAttribute(52, "ValueChanged",
+            EventCallback.Factory.Create<DateTime>(
+                this, value => HandleValueChanged(field, value)));
+        builder.AddAttribute(53, "ValueExpression",
+            GetValueExpression(field));
+        builder.AddAttribute(54, "Disabled", field.IsReadonly);
+        builder.CloseComponent();
+    }
+
+    private Expression<Func<string>> GetValueExpression(FormField field)
+    {
+        if (FormData is Dictionary<string, object>)
+        {
+            return Expression.Lambda<Func<string>>(
+                    Expression.Constant(FormValues[field.Name]?.ToString(), typeof(string))
+            );
+        }
+        else
+        {
+            return Expression.Lambda<Func<string>>(
+                Expression.Property(
+                    Expression.Constant(FormData), field.Name));
+        }
+    }
+
+    private async Task HandleValueChanged(FormField field, object value)
+    {
+        FormValues[field.Name] = value;
+
+        // Evaluate rules for this field
+        await EvaluateRules(field.Id);
+
+        // Update the form data object
+        if (FormData is Dictionary<string, object> dict)
+        {
+            dict[field.Name] = value;
+        }
+        else
+        {
+            var prop = typeof(TItem).GetProperty(field.Name);
+            if (prop != null)
+            {
+                prop.SetValue(FormData, Convert.ChangeType(value, prop.PropertyType));
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task EvaluateRules(string sourceFieldId)
+    {
+        var rules = FormDefinition.Fields
+            .SelectMany(f => f.Rules)
+            .Where(r => r.TargetFieldId == sourceFieldId)
+            .ToList();
+
+        foreach (var rule in rules)
+        {
+            var sourceField = FormDefinition.Fields.First(f => f.Id == sourceFieldId);
+            var targetField = FormDefinition.Fields.First(f => f.Id == rule.TargetFieldId);
+
+            var conditionMet = EvaluateCondition(sourceField, rule.Condition);
+
+            if (conditionMet)
+            {
+                foreach (var action in rule.Actions)
+                {
+                    switch (action.Type)
+                    {
+                        case "show":
+                            targetField.IsHidden = false;
+                            break;
+                        case "hide":
+                            targetField.IsHidden = true;
+                            break;
+                        case "enable":
+                            targetField.IsReadonly = false;
+                            break;
+                        case "disable":
+                            targetField.IsReadonly = true;
+                            break;
+                        case "setValue":
+                            FormValues[targetField.Name] = action.Value;
+                            break;
+                        case "setRequired":
+                            targetField.IsRequired = Convert.ToBoolean(action.Value);
+                            break;
+                    }
+                }
+            }
+        }
+    }
+
+    private bool EvaluateCondition(FormField field, string condition)
+    {
+        if (string.IsNullOrWhiteSpace(condition)) return false;
+
+        var fieldValue = FormValues[field.Name];
+
+        // Simple condition evaluation - consider using a proper expression evaluator
+        if (condition.Contains(">="))
+        {
+            var parts = condition.Split(">=");
+            if (field.Type == FieldType.Number && int.TryParse(fieldValue?.ToString(), out int numValue))
+            {
+                return numValue >= int.Parse(parts[1].Trim());
+            }
+        }
+        else if (condition.Contains("<="))
+        {
+            var parts = condition.Split("<=");
+            if (field.Type == FieldType.Number && int.TryParse(fieldValue?.ToString(), out int numValue))
+            {
+                return numValue <= int.Parse(parts[1].Trim());
+            }
+        }
+        else if (condition.Contains(">"))
+        {
+            var parts = condition.Split('>');
+            if (field.Type == FieldType.Number && int.TryParse(fieldValue?.ToString(), out int numValue))
+            {
+                return numValue > int.Parse(parts[1].Trim());
+            }
+        }
+        else if (condition.Contains("<"))
+        {
+            var parts = condition.Split('<');
+            if (field.Type == FieldType.Number && int.TryParse(fieldValue?.ToString(), out int numValue))
+            {
+                return numValue < int.Parse(parts[1].Trim());
+            }
+        }
+        else if (condition.Contains("=="))
+        {
+            var parts = condition.Split("==");
+            return fieldValue?.ToString() == parts[1].Trim();
+        }
+        else if (condition.Contains("!="))
+        {
+            var parts = condition.Split("!=");
+            return fieldValue?.ToString() != parts[1].Trim();
+        }
+
+        return false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        await OnValidSubmit.InvokeAsync(FormData);
+    }
+}

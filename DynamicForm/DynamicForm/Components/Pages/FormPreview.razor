@@ -1,0 +1,42 @@
+﻿@page "/form-preview/{Id}"
+@using DynamicForm.Models
+@using DynamicForm.Services
+@inject IFormService FormService
+
+<h3>Form Preview: @FormDefinition?.Name</h3>
+
+@if (FormDefinition != null)
+{
+    <div class="card mt-3">
+        <div class="card-body">
+            <DynamicForm TItem="Dictionary<string, object>"
+                         FormDefinition="FormDefinition"
+                         FormData="new Dictionary<string, object>()"
+                         OnValidSubmit="HandleSubmit" />
+
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-warning">Form not found</div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; }
+    private FormDefinition FormDefinition { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        FormDefinition = await FormService.GetFormAsync(Id);
+    }
+
+    private void HandleSubmit(Dictionary<string, object> formData)
+    {
+        Console.WriteLine("Form submitted with data:");
+        foreach (var item in formData)
+        {
+            Console.WriteLine($"{item.Key}: {item.Value}");
+        }
+    }
+}

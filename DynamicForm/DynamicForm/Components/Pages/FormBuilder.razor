@@ -1,0 +1,188 @@
+﻿@page "/form-builder"
+@page "/form-builder/{Id}"
+@using DynamicForm.Components.Shared
+@using DynamicForm.Helper
+@using DynamicForm.Models
+@using DynamicForm.Services
+@inject IFormService FormService
+@inject FormBuilderState FormBuilderState
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+<PageTitle>Form Builder</PageTitle>
+
+<h3>Form Builder</h3>
+
+<div class="form-builder-container">
+    <div class="form-builder-toolbar mb-3">
+        <button @onclick="AddNewField" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add Field
+        </button>
+        <button @onclick="TogglePreview" class="btn btn-secondary">
+            <i class="fas fa-eye"></i> @(FormBuilderState.ShowPreview ? "Hide Preview" : "Show Preview")
+        </button>
+        <button @onclick="SaveForm" class="btn btn-success">
+            <i class="fas fa-save"></i> Save Form
+        </button>
+        <button @onclick="NewForm" class="btn btn-info">
+            <i class="fas fa-file"></i> New Form
+        </button>
+    </div>
+
+    <div class="row">
+        <div class="@(FormBuilderState.ShowPreview ? "col-md-6" : "col-md-12")">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Form Definition</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>Form Name</label>
+                        <InputText @bind-Value="FormBuilderState.CurrentForm.Name" class="form-control" />
+                    </div>
+
+                    @if (FormBuilderState.CurrentForm.Fields.Any())
+                    {
+                        <div class="fields-list">
+                            @foreach (var field in FormBuilderState.CurrentForm.Fields)
+                            {
+                                <div class="card mb-3 field-item">
+                                    <div class="card-header d-flex justify-content-between">
+                                        <h6>@(string.IsNullOrEmpty(field.Label) ? "New Field" : field.Label)</h6>
+                                        <button @onclick="@(() => RemoveField(field))" class="btn btn-sm btn-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        <FieldEditor Field="field"
+                                                     FormDefinition="FormBuilderState.CurrentForm"
+                                                     OnFieldChanged="FieldChanged" />
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            No fields added yet. Click "Add Field" to get started.
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @if (FormBuilderState.ShowPreview)
+        {
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Form Preview</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (FormBuilderState.CurrentForm.Fields.Any())
+                        {
+                            <DynamicForm FormDefinition="FormBuilderState.CurrentForm"
+                                         FormData="CreatePreviewModel()" />
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning">
+                                Add fields to see the preview
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        FormBuilderState.OnChange += StateHasChanged;
+
+        if (!string.IsNullOrEmpty(Id))
+        {
+            var form = await FormService.GetFormAsync(Id);
+            if (form != null)
+            {
+                FormBuilderState.LoadForm(form);
+            }
+        }
+        else
+        {
+            FormBuilderState.NewForm();
+        }
+    }
+
+    private void AddNewField()
+    {
+        var newField = new FormField
+            {
+                Name = $"field{FormBuilderState.CurrentForm.Fields.Count + 1}",
+                Label = $"Field {FormBuilderState.CurrentForm.Fields.Count + 1}",
+                Type = FieldType.Text
+            };
+        FormBuilderState.CurrentForm.Fields.Add(newField);
+        FormBuilderState.NotifyStateChanged();
+    }
+
+    private void RemoveField(FormField field)
+    {
+        FormBuilderState.CurrentForm.Fields.Remove(field);
+        FormBuilderState.NotifyStateChanged();
+    }
+
+    private void FieldChanged()
+    {
+        FormBuilderState.NotifyStateChanged();
+    }
+
+    private async Task SaveForm()
+    {
+        await FormService.SaveFormAsync(FormBuilderState.CurrentForm);
+        Navigation.NavigateTo($"/form-builder/{FormBuilderState.CurrentForm.Id}");
+    }
+
+    private void NewForm()
+    {
+        FormBuilderState.NewForm();
+        Navigation.NavigateTo("/form-builder");
+    }
+
+    private void TogglePreview()
+    {
+        FormBuilderState.TogglePreview();
+    }
+
+    private object CreatePreviewModel()
+    {
+        // Create a dynamic object or dictionary to bind to the form
+        // In a real app, you might want to generate a proper type
+        var model = new Dictionary<string, object>();
+        foreach (var field in FormBuilderState.CurrentForm.Fields)
+        {
+            model[field.Name] = field.DefaultValue ?? GetDefaultValue(field.Type);
+        }
+        return model;
+    }
+
+    private object GetDefaultValue(FieldType type)
+    {
+        return type switch
+        {
+            FieldType.Number => 0,
+            FieldType.Checkbox => false,
+            FieldType.Date => DateTime.Today,
+            _ => string.Empty
+        };
+    }
+
+    public void Dispose()
+    {
+        FormBuilderState.OnChange -= StateHasChanged;
+    }
+}

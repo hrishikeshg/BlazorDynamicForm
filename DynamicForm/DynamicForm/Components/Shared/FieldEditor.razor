@@ -1,0 +1,200 @@
+﻿@using System.Linq.Expressions
+@using DynamicForm.Models
+@using DynamicForm.Services
+@using DynamicForm.Helper
+
+
+<div class="field-editor">
+    <div class="form-group">
+        <label>Field Type</label>
+        <label>Field Type</label>
+        <InputSelect Value="Field.Type"
+                     ValueChanged="@(async (FieldType value) => { Field.Type = value; await OnFieldChanged.InvokeAsync(); })"
+                     ValueExpression="@(() => Field.Type)"
+                     class="form-control">
+            @foreach (var type in Enum.GetValues(typeof(FieldType)))
+            {
+                <option value="@type">@type</option>
+            }
+        </InputSelect>
+    </div>
+
+    <div class="form-group">
+        <label>Name (Technical Name)</label>
+        <InputText @bind-Value="Field.Name" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label>Label (Display Text)</label>
+        <InputText @bind-Value="Field.Label" class="form-control" />
+    </div>
+
+    @if (Field.Type != FieldType.DropDown && Field.Type != FieldType.Checkbox)
+    {
+        <div class="form-group">
+            <label>Default Value</label>
+            <InputText @bind-Value="Field.DefaultValue" class="form-control" />
+        </div>
+    }
+
+    <div class="form-check">
+        <InputCheckbox @bind-Value="Field.IsRequired" class="form-check-input" />
+        <label class="form-check-label">Required</label>
+    </div>
+
+    <div class="form-check">
+        <InputCheckbox @bind-Value="Field.IsReadonly" class="form-check-input" />
+        <label class="form-check-label">Readonly</label>
+    </div>
+
+    <div class="form-check">
+        <InputCheckbox @bind-Value="Field.IsHidden" class="form-check-input" />
+        <label class="form-check-label">Hidden</label>
+    </div>
+
+    @if (Field.Type == FieldType.Text)
+    {
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label>Min Length</label>
+                    <InputNumber @bind-Value="Field.MinLength" class="form-control" />
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label>Max Length</label>
+                    <InputNumber @bind-Value="Field.MaxLength" class="form-control" />
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Regex Pattern</label>
+            <InputText @bind-Value="Field.RegexPattern" class="form-control" />
+            <small class="form-text text-muted">Optional regular expression pattern for validation</small>
+        </div>
+    }
+
+    @if (Field.Type == FieldType.DropDown)
+    {
+        <div class="form-group">
+            <label>Dropdown Options</label>
+            <div class="dropdown-options-list">
+                @foreach (var item in Field.Data)
+                {
+                    <div class="input-group mb-2">
+                        <InputText @bind-Value="item.Value" class="form-control" placeholder="Value" />
+                        <InputText @bind-Value="item.Text" class="form-control" placeholder="Display Text" />
+                        <button @onclick="@(() => RemoveDropdownItem(item))" class="btn btn-danger">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                }
+                <button @onclick="AddDropdownItem" class="btn btn-secondary">
+                    <i class="fas fa-plus"></i> Add Option
+                </button>
+            </div>
+        </div>
+    }
+
+    <div class="rules-section mt-4">
+        <h5>Rules</h5>
+        <div class="rules-list">
+            @foreach (var rule in Field.Rules)
+            {
+                <div class="card mb-2">
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label>Target Field</label>
+                            <InputSelect @bind-Value="rule.TargetFieldId" class="form-control">
+                                <option value="">-- Select Target Field --</option>
+                                @foreach (var targetField in FormDefinition.Fields.Where(f => f.Id != Field.Id))
+                                {
+                                    <option value="@targetField.Id">@targetField.Label</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="form-group">
+                            <label>Condition</label>
+                            <InputText @bind-Value="rule.Condition" class="form-control" placeholder="e.g., value > 18" />
+                        </div>
+                        <div class="form-group">
+                            <label>Actions</label>
+                            @foreach (var action in rule.Actions)
+                            {
+                                <div class="action-item mb-2">
+                                    <div class="input-group">
+                                        <select @bind="action.Type" class="form-control">
+                                            <option value="show">Show Field</option>
+                                            <option value="hide">Hide Field</option>
+                                            <option value="enable">Enable Field</option>
+                                            <option value="disable">Disable Field</option>
+                                            <option value="setValue">Set Value</option>
+                                        </select>
+                                        @if (action.Type == "setValue")
+                                        {
+                                            <input type="text" @bind="action.Value" class="form-control" placeholder="Value" />
+                                        }
+                                        <button @onclick="@(() => RemoveAction(rule, action))" class="btn btn-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                            <button @onclick="@(() => AddAction(rule))" class="btn btn-secondary">
+                                <i class="fas fa-plus"></i> Add Action
+                            </button>
+                        </div>
+                        <button @onclick="@(() => RemoveRule(rule))" class="btn btn-sm btn-danger">
+                            <i class="fas fa-trash"></i> Remove Rule
+                        </button>
+                    </div>
+                </div>
+            }
+            <button @onclick="AddRule" class="btn btn-secondary">
+                <i class="fas fa-plus"></i> Add Rule
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public FormField Field { get; set; }
+    [Parameter] public FormDefinition FormDefinition { get; set; }
+    [Parameter] public EventCallback OnFieldChanged { get; set; }
+
+    private void AddDropdownItem()
+    {
+        Field.Data.Add(new SelectListItem { Value = "option", Text = "Option" });
+        OnFieldChanged.InvokeAsync();
+    }
+
+    private void RemoveDropdownItem(SelectListItem item)
+    {
+        Field.Data.Remove(item);
+        OnFieldChanged.InvokeAsync();
+    }
+    private void AddRule()
+    {
+        Field.Rules.Add(new FieldRule());
+        OnFieldChanged.InvokeAsync();
+    }
+
+    private void RemoveRule(FieldRule rule)
+    {
+        Field.Rules.Remove(rule);
+        OnFieldChanged.InvokeAsync();
+    }
+
+    private void AddAction(FieldRule rule)
+    {
+        rule.Actions.Add(new FieldAction { Type = "enable" });
+        OnFieldChanged.InvokeAsync();
+    }
+
+    private void RemoveAction(FieldRule rule, FieldAction action)
+    {
+        rule.Actions.Remove(action);
+        OnFieldChanged.InvokeAsync();
+    }
+}
