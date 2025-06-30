@@ -1,0 +1,56 @@
+# Build and publish folders
+/bin/
+/obj/
+/out/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# VS Code settings
+.vscode/
+
+# Rider settings
+.idea/
+
+# ASP.NET specific
+wwwroot/css/site.css
+wwwroot/js/site.js
+wwwroot/scopedcss/
+
+# Configuration transforms
+appsettings.*.json
+
+# EF Core tools
+Migrations/
+
+# Coverage tools
+coverage/
+*.coverage
+*.coveragexml
+
+# Logs
+*.log
+
+# Secrets and sensitive data
+secrets.json
+
+# Dependency graph cache
+project.assets.json
+project.nuget.cache
+
+# NuGet packages and caches
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# OS junk
+Thumbs.db
+.DS_Store
+
+# Resharper files
+_ReSharper*/
+*.DotSettings.user
