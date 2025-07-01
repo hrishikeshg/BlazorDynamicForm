@@ -8,6 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddServerSideBlazor()
+    .AddCircuitOptions(options => options.DetailedErrors = true);
+
 builder.Services.AddScoped<IFormService, FormService>();
 builder.Services.AddScoped<FormBuilderState>();
 

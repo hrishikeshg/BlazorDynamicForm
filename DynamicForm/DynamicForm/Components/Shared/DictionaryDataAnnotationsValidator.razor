@@ -1,0 +1,66 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using DynamicForm.Models
+@using Microsoft.AspNetCore.Components.Forms
+@implements IDisposable
+
+<CascadingValue Value="this">
+    @ChildContent
+</CascadingValue>
+
+@code {
+    [Parameter] public Dictionary<string, object> Model { get; set; }
+    [Parameter] public RenderFragment ChildContent { get; set; }
+
+    private EditContext _editContext;
+    private ValidationMessageStore _messageStore;
+    private FormFieldModel _wrapper;
+
+    [CascadingParameter] private EditContext CurrentEditContext { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (CurrentEditContext == null)
+        {
+            throw new InvalidOperationException($"{nameof(DictionaryDataAnnotationsValidator)} requires a cascading " +
+                $"parameter of type {nameof(EditContext)}.");
+        }
+
+        _wrapper = new FormFieldModel(Model);
+        _editContext = CurrentEditContext;
+        _messageStore = new ValidationMessageStore(_editContext);
+        _editContext.OnValidationRequested += ValidateModel;
+        _editContext.OnFieldChanged += HandleFieldChanged;
+    }
+
+    private void ValidateModel(object sender, ValidationRequestedEventArgs args)
+    {
+        _messageStore.Clear();
+
+        // Add your validation logic here
+        foreach (var field in Model)
+        {
+            if (string.IsNullOrEmpty(field.Value?.ToString()))
+            {
+                var fieldIdentifier = new FieldIdentifier(_wrapper, $"[{field.Key}]");
+                _messageStore.Add(fieldIdentifier, "This field is required");
+            }
+        }
+
+        _editContext.NotifyValidationStateChanged();
+    }
+
+    private void HandleFieldChanged(object sender, FieldChangedEventArgs args)
+    {
+        _messageStore.Clear(args.FieldIdentifier);
+        _editContext.NotifyValidationStateChanged();
+    }
+
+    public void Dispose()
+    {
+        if (_editContext != null)
+        {
+            _editContext.OnValidationRequested -= ValidateModel;
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+        }
+    }
+}

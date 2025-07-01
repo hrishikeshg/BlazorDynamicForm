@@ -1,15 +1,46 @@
-﻿@using DynamicForm.Models
+﻿@using DynamicForm.Components.Shared
+@using DynamicForm.Helper
+@using DynamicForm.Models
 @using DynamicForm.Services
 @using System.Linq.Expressions
 @using Microsoft.AspNetCore.Components.Rendering
 @typeparam TItem
 @inherits OwningComponentBase<FormService>
 
-<EditForm Model="@FormData" OnValidSubmit="@HandleValidSubmit">
-    <DataAnnotationsValidator />
+<EditForm Model="@FormValues" OnValidSubmit="@HandleValidSubmit">
+    @* @if (UseDictionaryModel)
+    {
+        <DictionaryDataAnnotationsValidator Model="@FormValues" />       
+    }
+    else
+    {
+        <DataAnnotationsValidator />
+    } *@
+    <CustomValidator @ref="_validator" Fields="@FormDefinition.Fields" />
     <ValidationSummary />
-
     @foreach (var field in FormDefinition.Fields)
+    {
+        @if (!field.IsHidden)
+        {
+            <div class="form-group" style="@(field.IsHidden ? "display:none;" : "")">
+                <label>@field.Label @(field.IsRequired ? "*" : "")</label>
+
+                @{
+                    var wrapper = new DynamicFieldWrapper(FormValues, field.Name);
+                }
+
+                @if (field.Type == FieldType.Text)
+                {
+                    <InputText @bind-Value="wrapper.Value"
+                               class="form-control" />
+                }
+                <!-- Add other field types as needed -->
+
+                <ValidationMessage For="@(() => wrapper.Value)" />
+            </div>
+        }
+    }
+    @* @foreach (var field in FormDefinition.Fields)
     {
         @if (!field.IsHidden)
         {
@@ -17,7 +48,7 @@
                 @RenderField(field)
             </div>
         }
-    }
+    } *@
 
     <button type="submit" class="btn btn-primary">Submit</button>
 </EditForm>
@@ -27,21 +58,42 @@
     [Parameter] public TItem FormData { get; set; }
     [Parameter] public EventCallback<TItem> OnValidSubmit { get; set; }
     //[Parameter] public EventCallback<Dictionary<string, object>> OnValidSubmit { get; set; }
-
+    private CustomValidator _validator;
     private Dictionary<string, object> FormValues = new();
+    private FormFieldModel WorkingModel;
+    private bool UseDictionaryModel => FormData is Dictionary<string, object>;
 
     protected override void OnInitialized()
     {
-        // Initialize form values from FormData or defaults
+        WorkingModel = new FormFieldModel(FormValues);
+
+        // Initialize form values
         foreach (var field in FormDefinition.Fields)
         {
             if (!FormValues.ContainsKey(field.Name))
             {
-                FormValues[field.Name] = field.DefaultValue ?? GetDefaultValue(field.Type);
+                FormValues[field.Name] = GetInitialValue(field);
             }
         }
     }
+    private object GetInitialValue(FormField field)
+    {
+        // Try to get value from FormData if it's a dictionary
+        if (FormData is Dictionary<string, object> dict && dict.TryGetValue(field.Name, out var value))
+        {
+            return value;
+        }
 
+        // Try to get value from FormData properties if it's a regular object
+        var prop = typeof(TItem).GetProperty(field.Name);
+        if (prop != null && FormData != null)
+        {
+            return prop.GetValue(FormData);
+        }
+
+        // Fall back to default value
+        return field.DefaultValue ?? GetDefaultValue(field.Type);
+    }
     private object GetDefaultValue(FieldType type)
     {
         return type switch
@@ -55,47 +107,92 @@
 
     private RenderFragment RenderField(FormField field) => builder =>
     {
-        builder.OpenElement(0, "div");
-        builder.AddAttribute(1, "class", "form-field");
-
-        // Label
-        builder.OpenElement(2, "label");
-        builder.AddContent(3, field.Label);
-        if (field.IsRequired)
+        try
         {
-            builder.AddContent(4, " *");
-        }
-        builder.CloseElement();
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "form-field");
 
-        // Input control
-        switch (field.Type)
+            // Label
+            builder.OpenElement(2, "label");
+            builder.AddContent(3, field.Label);
+            if (field.IsRequired)
+            {
+                builder.AddContent(4, " *");
+            }
+            builder.CloseElement();
+
+            // Input control
+            switch (field.Type)
+            {
+                case FieldType.Text:
+                    RenderTextInput(builder, field);
+                    break;
+                case FieldType.Number:
+                    RenderNumberInput(builder, field);
+                    break;
+                case FieldType.DropDown:
+                    RenderDropdown(builder, field);
+                    break;
+                case FieldType.Checkbox:
+                    RenderCheckbox(builder, field);
+                    break;
+                case FieldType.Date:
+                    RenderDateInput(builder, field);
+                    break;
+            }
+
+            // Validation message
+            // Validation message
+            builder.OpenComponent<ValidationMessage<string>>(100);
+            builder.AddAttribute(101, "For", CreateValueExpression(field));
+            builder.CloseComponent();
+            // builder.OpenComponent<ValidationMessage<string>>(100);
+            // if (FormData is Dictionary<string, object>)
+            // {
+            //     builder.AddAttribute(101, "For",
+            //     Expression.Lambda<Func<string>>(
+            //         Expression.Constant(field.Name)));
+            // }
+            // else
+            // {
+            //     builder.AddAttribute(101, "For",
+            //     Expression.Lambda<Func<string>>(
+            //         Expression.Property(
+            //             Expression.Constant(FormData), field.Name)));
+            // }
+            // builder.CloseComponent();
+
+            builder.CloseElement();
+        }
+        catch (Exception ex)
         {
-            case FieldType.Text:
-                RenderTextInput(builder, field);
-                break;
-            case FieldType.Number:
-                RenderNumberInput(builder, field);
-                break;
-            case FieldType.DropDown:
-                RenderDropdown(builder, field);
-                break;
-            case FieldType.Checkbox:
-                RenderCheckbox(builder, field);
-                break;
-            case FieldType.Date:
-                RenderDateInput(builder, field);
-                break;
+            throw ex;
         }
-
-        // Validation message
-        builder.OpenComponent<ValidationMessage<string>>(100);
-        builder.AddAttribute(101, "For",
-            GetValidationForExpression(field));
-        builder.CloseComponent();
-
-        builder.CloseElement();
     };
+    private LambdaExpression CreateValueExpression(FormField field)
+    {
+        if (UseDictionaryModel)
+        {
+            // Create expression: () => WorkingModel[fieldName]
+            var modelExpr = Expression.Constant(WorkingModel);
+            var indexer = typeof(FormFieldModel).GetProperty("Item");
+            var indexExpr = Expression.Property(
+                modelExpr,
+                indexer,
+                Expression.Constant(field.Name));
 
+            return Expression.Lambda(
+                Expression.Convert(indexExpr, typeof(string)),
+                Array.Empty<ParameterExpression>());
+        }
+        else
+        {
+            // Standard property access for strongly-typed models
+            var param = Expression.Parameter(typeof(TItem));
+            var property = Expression.Property(param, field.Name);
+            return Expression.Lambda(property, param);
+        }
+    }
     private Expression<Func<string>> GetValidationForExpression(FormField field)
     {
         if (FormData is Dictionary<string, object>)
@@ -107,10 +204,10 @@
         }
         else
         {
-            // Handle strongly-typed model case
-            return Expression.Lambda<Func<string>>(
-                Expression.Property(
-                    Expression.Constant(FormData), field.Name));
+            // For strongly-typed models, create the proper property access expression
+            var param = Expression.Parameter(typeof(TItem));
+            var property = Expression.Property(param, field.Name);
+            return Expression.Lambda<Func<string>>(property, param);
         }
     }
 
@@ -192,19 +289,20 @@
         builder.CloseComponent();
     }
 
-    private Expression<Func<string>> GetValueExpression(FormField field)
+    private LambdaExpression GetValueExpression(FormField field)
     {
         if (FormData is Dictionary<string, object>)
         {
+            // For dictionary models, return a simple expression
             return Expression.Lambda<Func<string>>(
-                    Expression.Constant(FormValues[field.Name]?.ToString(), typeof(string))
-            );
+                Expression.Constant(FormValues[field.Name]?.ToString()));
         }
         else
         {
-            return Expression.Lambda<Func<string>>(
-                Expression.Property(
-                    Expression.Constant(FormData), field.Name));
+            // For strongly-typed models, return the property access expression
+            var param = Expression.Parameter(typeof(TItem));
+            var property = Expression.Property(param, field.Name);
+            return Expression.Lambda(property, param);
         }
     }
 
@@ -331,6 +429,9 @@
 
     private async Task HandleValidSubmit()
     {
-        await OnValidSubmit.InvokeAsync(FormData);
+        if (_validator?.Validate() ?? false)
+        {
+            await OnValidSubmit.InvokeAsync(FormData);
+        }        
     }
 }

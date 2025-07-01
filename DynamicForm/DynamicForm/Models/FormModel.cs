@@ -52,3 +52,15 @@ public class SelectListItem
     public string Value { get; set; }
     public string Text { get; set; }
 }
+public class FormFieldModel
+{
+    private readonly Dictionary<string, object> _values;
+
+    public FormFieldModel(Dictionary<string, object> values) => _values = values;
+
+    public string this[string fieldName]
+    {
+        get => _values.TryGetValue(fieldName, out var value) ? value?.ToString() : null;
+        set => _values[fieldName] = value;
+    }
+}
