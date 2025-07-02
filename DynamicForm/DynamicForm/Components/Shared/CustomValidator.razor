@@ -1,21 +1,22 @@
 ﻿@using DynamicForm.Models
 @using Microsoft.AspNetCore.Components.Forms
 @using System.ComponentModel.DataAnnotations
+@using System.Text.RegularExpressions
 
 <CascadingValue Value="this">
     @ChildContent
 </CascadingValue>
 
 @code {
-    [CascadingParameter] private EditContext EditContext { get; set; }
+    [CascadingParameter] private EditContext editContext { get; set; }
     [Parameter] public List<FormField> Fields { get; set; }
     [Parameter] public RenderFragment ChildContent { get; set; }
-
+    
     private ValidationMessageStore _messageStore;
 
     protected override void OnInitialized()
     {
-        _messageStore = new ValidationMessageStore(EditContext);
+        _messageStore = new ValidationMessageStore(editContext);
     }
 
     public bool Validate()
@@ -23,20 +24,40 @@
         _messageStore.Clear();
         bool isValid = true;
 
-        foreach (var field in Fields)
+        foreach (var field in Fields.Where(f => !f.IsHidden))
         {
             var fieldIdentifier = new FieldIdentifier(this, field.Name);
-
-            if (field.IsRequired && string.IsNullOrEmpty(_messageStore[fieldIdentifier]?.ToString()))
+            var value = _messageStore[fieldIdentifier]?.ToString();
+            
+            // Required validation
+            if (field.IsRequired && string.IsNullOrEmpty(value))
             {
                 _messageStore.Add(fieldIdentifier, $"{field.Label} is required");
                 isValid = false;
             }
-
-            // Add other validation rules as needed
+            
+            // MinLength validation
+            if (field.MinLength > 0 && value?.Length < field.MinLength)
+            {
+                _messageStore.Add(fieldIdentifier, 
+                    $"{field.Label} must be at least {field.MinLength} characters");
+                isValid = false;
+            }
+            
+            // Regex validation
+            if (!string.IsNullOrEmpty(field.RegexPattern))
+            {
+                var regex = new Regex(field.RegexPattern);
+                if (!regex.IsMatch(value ?? string.Empty))
+                {
+                    _messageStore.Add(fieldIdentifier, 
+                        $"{field.Label} format is invalid");
+                    isValid = false;
+                }
+            }
         }
 
-        EditContext.NotifyValidationStateChanged();
+        editContext.NotifyValidationStateChanged();
         return isValid;
     }
 }

@@ -7,15 +7,7 @@
 @typeparam TItem
 @inherits OwningComponentBase<FormService>
 
-<EditForm Model="@FormValues" OnValidSubmit="@HandleValidSubmit">
-    @* @if (UseDictionaryModel)
-    {
-        <DictionaryDataAnnotationsValidator Model="@FormValues" />       
-    }
-    else
-    {
-        <DataAnnotationsValidator />
-    } *@
+<EditForm Model="@FormValues" FormName="@GetFormName()" OnValidSubmit="@HandleValidSubmit">
     <CustomValidator @ref="_validator" Fields="@FormDefinition.Fields" />
     <ValidationSummary />
     @foreach (var field in FormDefinition.Fields)
@@ -26,38 +18,66 @@
                 <label>@field.Label @(field.IsRequired ? "*" : "")</label>
 
                 @{
-                    var wrapper = new DynamicFieldWrapper(FormValues, field.Name);
+                    var wrapper = new DynamicFieldWrapper(FormValues, field.Name)
+                        {
+                            Options = field.Data ?? new List<SelectListItem>()
+                        };
                 }
 
-                @if (field.Type == FieldType.Text)
+                @switch (field.Type)
                 {
-                    <InputText @bind-Value="wrapper.Value"
-                               class="form-control" />
+                    case FieldType.Text:
+                        <InputText @bind-Value="wrapper.Value"
+                                   class="form-control"
+                                   disabled="@field.IsReadonly" />
+                        break;
+                    case FieldType.Number:
+                        <InputNumber @bind-Value="wrapper.NumberValue"
+                                     class="form-control"
+                                     disabled="@field.IsReadonly" />
+                        break;
+                    case FieldType.Checkbox:
+                        <InputCheckbox @bind-Value="wrapper.BooleanValue"
+                                       class="form-check-input"
+                                       disabled="@field.IsReadonly" />
+                        break;
+
+                    case FieldType.Date:
+                        <InputDate @bind-Value="wrapper.DateValue"
+                                   class="form-control"
+                                   disabled="@field.IsReadonly" />
+                        break;
+                    case FieldType.DropDown:
+                        <InputSelect @bind-Value="wrapper.Value"
+                                     class="form-control"
+                                     disabled="@field.IsReadonly">
+                            <option value="">-- Select --</option>
+                            @foreach (var item in wrapper.Options)
+                            {
+                                <option value="@item.Value">@item.Text</option>
+                            }
+                        </InputSelect>
+                        break;
+                    case FieldType.CascadingDropDown:
+                        <CascadingDropDown Field="@field"
+                                           FormValues="@FormValues"
+                                           FormDefinition="@FormDefinition" />
+                        break;
                 }
-                <!-- Add other field types as needed -->
 
                 <ValidationMessage For="@(() => wrapper.Value)" />
             </div>
         }
     }
-    @* @foreach (var field in FormDefinition.Fields)
-    {
-        @if (!field.IsHidden)
-        {
-            <div class="form-group" style="@(field.IsHidden ? "display:none;" : "")">
-                @RenderField(field)
-            </div>
-        }
-    } *@
-
     <button type="submit" class="btn btn-primary">Submit</button>
 </EditForm>
 
 @code {
     [Parameter] public FormDefinition FormDefinition { get; set; }
     [Parameter] public TItem FormData { get; set; }
-    [Parameter] public EventCallback<TItem> OnValidSubmit { get; set; }
-    //[Parameter] public EventCallback<Dictionary<string, object>> OnValidSubmit { get; set; }
+    [Parameter] public EventCallback<TItem> FormDataChanged { get; set; }
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+    
     private CustomValidator _validator;
     private Dictionary<string, object> FormValues = new();
     private FormFieldModel WorkingModel;
@@ -75,6 +95,13 @@
                 FormValues[field.Name] = GetInitialValue(field);
             }
         }
+    }
+    private string GetFormName()
+    {
+        // Use form ID if available, otherwise generate a unique name
+        return !string.IsNullOrEmpty(FormDefinition?.Id)
+            ? $"form_{FormDefinition.Id}"
+            : $"form_{Guid.NewGuid()}";
     }
     private object GetInitialValue(FormField field)
     {
@@ -105,70 +132,6 @@
         };
     }
 
-    private RenderFragment RenderField(FormField field) => builder =>
-    {
-        try
-        {
-            builder.OpenElement(0, "div");
-            builder.AddAttribute(1, "class", "form-field");
-
-            // Label
-            builder.OpenElement(2, "label");
-            builder.AddContent(3, field.Label);
-            if (field.IsRequired)
-            {
-                builder.AddContent(4, " *");
-            }
-            builder.CloseElement();
-
-            // Input control
-            switch (field.Type)
-            {
-                case FieldType.Text:
-                    RenderTextInput(builder, field);
-                    break;
-                case FieldType.Number:
-                    RenderNumberInput(builder, field);
-                    break;
-                case FieldType.DropDown:
-                    RenderDropdown(builder, field);
-                    break;
-                case FieldType.Checkbox:
-                    RenderCheckbox(builder, field);
-                    break;
-                case FieldType.Date:
-                    RenderDateInput(builder, field);
-                    break;
-            }
-
-            // Validation message
-            // Validation message
-            builder.OpenComponent<ValidationMessage<string>>(100);
-            builder.AddAttribute(101, "For", CreateValueExpression(field));
-            builder.CloseComponent();
-            // builder.OpenComponent<ValidationMessage<string>>(100);
-            // if (FormData is Dictionary<string, object>)
-            // {
-            //     builder.AddAttribute(101, "For",
-            //     Expression.Lambda<Func<string>>(
-            //         Expression.Constant(field.Name)));
-            // }
-            // else
-            // {
-            //     builder.AddAttribute(101, "For",
-            //     Expression.Lambda<Func<string>>(
-            //         Expression.Property(
-            //             Expression.Constant(FormData), field.Name)));
-            // }
-            // builder.CloseComponent();
-
-            builder.CloseElement();
-        }
-        catch (Exception ex)
-        {
-            throw ex;
-        }
-    };
     private LambdaExpression CreateValueExpression(FormField field)
     {
         if (UseDictionaryModel)
@@ -308,26 +271,57 @@
 
     private async Task HandleValueChanged(FormField field, object value)
     {
-        FormValues[field.Name] = value;
-
-        // Evaluate rules for this field
-        await EvaluateRules(field.Id);
-
-        // Update the form data object
-        if (FormData is Dictionary<string, object> dict)
+        try
         {
-            dict[field.Name] = value;
-        }
-        else
-        {
-            var prop = typeof(TItem).GetProperty(field.Name);
-            if (prop != null)
+            if (FormData is Dictionary<string, object> dict)
             {
-                prop.SetValue(FormData, Convert.ChangeType(value, prop.PropertyType));
+                dict[field.Name] = value;
+                await FormDataChanged.InvokeAsync(FormData);
             }
-        }
+            else if (FormData != null)
+            {
+                var prop = typeof(TItem).GetProperty(field.Name);
+                if (prop != null)
+                {
+                    try
+                    {
+                        var convertedValue = Convert.ChangeType(value, prop.PropertyType);
+                        prop.SetValue(FormData, convertedValue);
+                        await FormDataChanged.InvokeAsync(FormData);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error setting value: {ex.Message}");
+                    }
+                }
+            }
 
-        StateHasChanged();
+            await EvaluateRules(field.Id);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in HandleValueChanged: {ex.Message}");
+        }
+        // FormValues[field.Name] = value;
+
+        // // Evaluate rules for this field
+        // await EvaluateRules(field.Id);
+
+        // // Update the form data object
+        // if (FormData is Dictionary<string, object> dict)
+        // {
+        //     dict[field.Name] = value;
+        // }
+        // else
+        // {
+        //     var prop = typeof(TItem).GetProperty(field.Name);
+        //     if (prop != null)
+        //     {
+        //         prop.SetValue(FormData, Convert.ChangeType(value, prop.PropertyType));
+        //     }
+        // }
+
+        // StateHasChanged();
     }
 
     private async Task EvaluateRules(string sourceFieldId)
@@ -342,7 +336,14 @@
             var sourceField = FormDefinition.Fields.First(f => f.Id == sourceFieldId);
             var targetField = FormDefinition.Fields.First(f => f.Id == rule.TargetFieldId);
 
-            var conditionMet = EvaluateCondition(sourceField, rule.Condition);
+            var sourceValue = FormValues.TryGetValue(sourceField.Name, out var val) ? val?.ToString() : null;
+            // Get the current value of the source field
+            //var conditionMet = EvaluateCondition(sourceField, rule.Condition);
+            // var conditionMet = string.IsNullOrEmpty(rule.Condition) ||
+            //              EvaluateCondition(rule.Condition, FormValues[sourceFieldId]?.ToString());
+
+            var conditionMet = string.IsNullOrEmpty(rule.Condition) ||
+                         EvaluateCondition(sourceField, sourceValue, rule.Condition);
 
             if (conditionMet)
             {
@@ -368,70 +369,113 @@
                         case "setRequired":
                             targetField.IsRequired = Convert.ToBoolean(action.Value);
                             break;
+                        case "loadOptions":
+                            if (targetField.Type == FieldType.DropDown ||
+                            targetField.Type == FieldType.CascadingDropDown)
+                            {
+                                await UpdateDropdownOptions(sourceField, targetField, sourceValue);
+                            }
+                            break;
                     }
                 }
             }
         }
+        StateHasChanged();
+    }
+    private bool EvaluateCondition(FormField sourceField, string sourceValue, string condition)
+    {
+        if (string.IsNullOrEmpty(condition)) return true;
+
+        // Handle different field types appropriately
+        switch (sourceField.Type)
+        {
+            case FieldType.Number when int.TryParse(sourceValue, out var numValue):
+                return EvaluateNumericCondition(numValue, condition);
+
+            case FieldType.Checkbox when bool.TryParse(sourceValue, out var boolValue):
+                return EvaluateBooleanCondition(boolValue, condition);
+
+            default: // Text, DropDown, etc.
+                return EvaluateStringCondition(sourceValue, condition);
+        }
     }
 
-    private bool EvaluateCondition(FormField field, string condition)
+    private bool EvaluateNumericCondition(int value, string condition)
     {
-        if (string.IsNullOrWhiteSpace(condition)) return false;
-
-        var fieldValue = FormValues[field.Name];
-
-        // Simple condition evaluation - consider using a proper expression evaluator
-        if (condition.Contains(">="))
-        {
-            var parts = condition.Split(">=");
-            if (field.Type == FieldType.Number && int.TryParse(fieldValue?.ToString(), out int numValue))
-            {
-                return numValue >= int.Parse(parts[1].Trim());
-            }
-        }
-        else if (condition.Contains("<="))
-        {
-            var parts = condition.Split("<=");
-            if (field.Type == FieldType.Number && int.TryParse(fieldValue?.ToString(), out int numValue))
-            {
-                return numValue <= int.Parse(parts[1].Trim());
-            }
-        }
-        else if (condition.Contains(">"))
-        {
-            var parts = condition.Split('>');
-            if (field.Type == FieldType.Number && int.TryParse(fieldValue?.ToString(), out int numValue))
-            {
-                return numValue > int.Parse(parts[1].Trim());
-            }
-        }
-        else if (condition.Contains("<"))
-        {
-            var parts = condition.Split('<');
-            if (field.Type == FieldType.Number && int.TryParse(fieldValue?.ToString(), out int numValue))
-            {
-                return numValue < int.Parse(parts[1].Trim());
-            }
-        }
-        else if (condition.Contains("=="))
-        {
-            var parts = condition.Split("==");
-            return fieldValue?.ToString() == parts[1].Trim();
-        }
-        else if (condition.Contains("!="))
-        {
-            var parts = condition.Split("!=");
-            return fieldValue?.ToString() != parts[1].Trim();
-        }
-
+        if (condition.Contains(">=")) return value >= ParseNumber(condition.Split(">=")[1]);
+        if (condition.Contains("<=")) return value <= ParseNumber(condition.Split("<=")[1]);
+        if (condition.Contains(">")) return value > ParseNumber(condition.Split(">")[1]);
+        if (condition.Contains("<")) return value < ParseNumber(condition.Split("<")[1]);
+        if (condition.Contains("==")) return value == ParseNumber(condition.Split("==")[1]);
+        if (condition.Contains("!=")) return value != ParseNumber(condition.Split("!=")[1]);
         return false;
     }
 
+    private bool EvaluateBooleanCondition(bool value, string condition)
+    {
+        return condition.ToLower() switch
+        {
+            "true" => value,
+            "false" => !value,
+            _ => false
+        };
+    }
+
+    private bool EvaluateStringCondition(string value, string condition)
+    {
+        if (condition.StartsWith("==")) return value == condition.Substring(2).Trim();
+        if (condition.StartsWith("!=")) return value != condition.Substring(2).Trim();
+        if (condition.StartsWith("contains ")) return value?.Contains(condition.Substring(9)) ?? false;
+        return false;
+    }
+
+    private int ParseNumber(string value) => int.TryParse(value.Trim(), out var num) ? num : 0;
+
+    private async Task UpdateDropdownOptions(FormField sourceField, FormField targetField, string sourceValue)
+    {
+        // For cascading dropdowns, check if we have predefined options
+        if (targetField.CascadingData != null &&
+            targetField.CascadingData.TryGetValue(sourceValue, out var options))
+        {
+            targetField.Data = options;
+        }
+        else
+        {
+            // Fallback to empty options if no predefined ones exist
+            targetField.Data = new List<SelectListItem>();
+        }
+
+        // Reset the current value when options change
+        FormValues[targetField.Name] = null;
+    }
+    
+    private int? GetNumberValue(DynamicFieldWrapper wrapper)
+    {
+        return int.TryParse(wrapper.Value, out var num) ? num : (int?)null;
+    }
+
+    private bool GetBoolValue(DynamicFieldWrapper wrapper)
+    {
+        return bool.TryParse(wrapper.Value, out var boolVal) && boolVal;
+    }
+
+    private DateTime? GetDateValue(DynamicFieldWrapper wrapper)
+    {
+        return DateTime.TryParse(wrapper.Value, out var date) ? date : (DateTime?)null;
+    }
+
+    private async Task HandleCascadingChange(FormField field, string value)
+    {
+        // Update dependent dropdowns
+        await EvaluateRules(field.Id);
+        StateHasChanged();
+    }
     private async Task HandleValidSubmit()
     {
         if (_validator?.Validate() ?? false)
         {
-            await OnValidSubmit.InvokeAsync(FormData);
+            await OnValidSubmit.InvokeAsync();
+            //await OnValidSubmit.InvokeAsync(FormData);
         }        
     }
 }

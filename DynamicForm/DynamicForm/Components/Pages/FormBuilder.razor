@@ -32,7 +32,7 @@
         <div class="@(FormBuilderState.ShowPreview ? "col-md-6" : "col-md-12")">
             <div class="card">
                 <div class="card-header">
-                    <h5>Form Definition</h5>
+                    <h5>Form Preview (Layout Only)</h5>
                 </div>
                 <div class="card-body">
                     <div class="form-group">
@@ -95,6 +95,16 @@
             </div>
         }
     </div>
+    @if (!string.IsNullOrEmpty(FormBuilderState.CurrentForm.Id))
+    {
+        <div class="form-builder-toolbar mb-3">
+            <!-- Existing buttons -->
+            <button @onclick="ReviewForm" class="btn btn-warning"
+                    disabled="@(FormBuilderState.CurrentForm.Fields.Count == 0)">
+                <i class="fas fa-clipboard-check"></i> Review Form
+            </button>
+        </div>
+    }
 </div>
 
 @code {
@@ -143,8 +153,24 @@
 
     private async Task SaveForm()
     {
-        await FormService.SaveFormAsync(FormBuilderState.CurrentForm);
-        Navigation.NavigateTo($"/form-builder/{FormBuilderState.CurrentForm.Id}");
+        try
+        {
+            // Save the form and get its ID
+            var formId = await FormService.SaveFormAsync(FormBuilderState.CurrentForm);
+
+            // Update the current form ID if it's new
+            if (string.IsNullOrEmpty(FormBuilderState.CurrentForm.Id))
+            {
+                FormBuilderState.CurrentForm.Id = formId;
+            }
+
+            Navigation.NavigateTo($"/form-builder/{formId}");
+        }
+        catch (Exception ex)
+        {
+            // Handle error (show toast, etc.)
+            Console.WriteLine($"Error saving form: {ex.Message}");
+        }
     }
 
     private void NewForm()
@@ -180,7 +206,18 @@
             _ => string.Empty
         };
     }
-
+    private void ReviewForm()
+    {
+        if (!string.IsNullOrEmpty(FormBuilderState.CurrentForm.Id))
+        {
+            Navigation.NavigateTo($"/form-review/{FormBuilderState.CurrentForm.Id}");
+        }
+        else
+        {
+            // Show error message to user
+            Console.WriteLine("Please save the form before reviewing");
+        }
+    }
     public void Dispose()
     {
         FormBuilderState.OnChange -= StateHasChanged;

@@ -7,7 +7,7 @@ public enum FieldType
     DropDown,
     Checkbox,
     Date,
-    // Add more as needed
+    CascadingDropDown
 }
 
 public class FormField
@@ -23,7 +23,11 @@ public class FormField
     public bool IsReadonly { get; set; }
     public string DefaultValue { get; set; }
     public string RegexPattern { get; set; }
-    public List<SelectListItem> Data { get; set; } = new(); // For dropdowns
+    public List<SelectListItem> Data { get; set; } = new(); // For dropdowns only
+
+    // For cascading dropdowns
+    public string ParentFieldId { get; set; }
+    public Dictionary<string, List<SelectListItem>> CascadingData { get; set; } = new();
     public List<FieldRule> Rules { get; set; } = new();
 }
 
@@ -33,6 +37,14 @@ public class FieldRule
     public string Condition { get; set; } // e.g., "value > 18"
     public List<FieldAction> Actions { get; set; } = new();
     // Actions could include: enable/disable, show/hide, set value, etc.
+    public DataSourceConfig DataSource { get; set; }
+}
+public class DataSourceConfig
+{
+    public string SourceField { get; set; }  // Field that triggers the load
+    public string ValuePath { get; set; }    // Property path for option values
+    public string TextPath { get; set; }     // Property path for display text
+    public string DataUrl { get; set; }      // API endpoint pattern (e.g., "/api/states?country={value}")
 }
 public class FieldAction
 {

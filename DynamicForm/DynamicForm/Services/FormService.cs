@@ -4,46 +4,15 @@ namespace DynamicForm.Services;
 
 public class FormService : IFormService
 {
-    private readonly List<FormDefinition> _forms = new();
+    private static readonly List<FormDefinition> _forms = new();
+    private readonly ILogger<FormService> _logger;
 
-    public FormService()
+    public FormService(ILogger<FormService> logger)
     {
-        // Initialize with some test forms
-        _forms.Add(new FormDefinition
-        {
-            Id = "1",
-            Name = "User Registration",
-            Fields = new List<FormField>
-            {
-                new FormField { Name = "FirstName", Label = "First Name", Type = FieldType.Text },
-                new FormField { Name = "LastName", Label = "Last Name", Type = FieldType.Text },
-                new FormField { Name = "Email", Label = "Email", Type = FieldType.Text }
-            }
-        });
-
-        _forms.Add(new FormDefinition
-        {
-            Id = "2",
-            Name = "Survey",
-            Fields = new List<FormField>
-            {
-                new FormField
-                {
-                    Name = "Rating",
-                    Label = "Rating",
-                    Type = FieldType.DropDown,
-                    Data = new List<SelectListItem>
-                    {
-                        new SelectListItem { Value = "1", Text = "Poor" },
-                        new SelectListItem { Value = "2", Text = "Fair" },
-                        new SelectListItem { Value = "3", Text = "Good" },
-                        new SelectListItem { Value = "4", Text = "Very Good" },
-                        new SelectListItem { Value = "5", Text = "Excellent" }
-                    }
-                }
-            }
-        });
+        _logger = logger;
+        // Initialize with sample data if needed
     }
+
     public Task<List<FormDefinition>> GetAllFormsAsync()
     {
         return Task.FromResult(_forms.ToList());
@@ -51,24 +20,31 @@ public class FormService : IFormService
 
     public Task<FormDefinition> GetFormAsync(string id)
     {
-        return Task.FromResult(_forms.FirstOrDefault(f => f.Id == id));
+        var form = _forms.FirstOrDefault(f => f.Id == id);
+        if (form == null)
+        {
+            _logger.LogWarning($"Form with ID {id} not found");
+        }
+        return Task.FromResult(form);
     }
 
-    public Task SaveFormAsync(FormDefinition form)
+    public Task<string> SaveFormAsync(FormDefinition form)
     {
         if (string.IsNullOrEmpty(form.Id))
         {
             form.Id = Guid.NewGuid().ToString();
+            _forms.Add(form);
         }
-
-        var existing = _forms.FirstOrDefault(f => f.Id == form.Id);
-        if (existing != null)
+        else
         {
-            _forms.Remove(existing);
+            var existing = _forms.FirstOrDefault(f => f.Id == form.Id);
+            if (existing != null)
+            {
+                _forms.Remove(existing);
+            }
+            _forms.Add(form);
         }
-
-        _forms.Add(form);
-        return Task.CompletedTask;
+        return Task.FromResult(form.Id);
     }
 
     public Task DeleteFormAsync(string id)

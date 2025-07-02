@@ -1,42 +1,105 @@
-﻿@page "/form-preview/{Id}"
+﻿@page "/form-review/{Id}"
 @using DynamicForm.Models
 @using DynamicForm.Services
 @inject IFormService FormService
-
-<h3>Form Preview: @FormDefinition?.Name</h3>
-
-@if (FormDefinition != null)
+@inject NavigationManager Navigation
+<h3>Form Review: @FormDefinition?.Name</h3>
+@if (_isLoading)
 {
-    <div class="card mt-3">
-        <div class="card-body">
-            <DynamicForm TItem="Dictionary<string, object>"
-                         FormDefinition="FormDefinition"
-                         FormData="new Dictionary<string, object>()"
-                         OnValidSubmit="HandleSubmit" />
-
-        </div>
+    <div class="alert alert-info">Loading form...</div>
+}
+else if (FormDefinition == null)
+{
+    <div class="alert alert-danger">
+        Form not found. Please ensure:
+        <ul>
+            <li>The form has been saved</li>
+            <li>The form ID is correct</li>
+        </ul>
+        <button @onclick="ReturnToBuilder" class="btn btn-primary">
+            Return to Form Builder
+        </button>
     </div>
 }
 else
 {
-    <div class="alert alert-warning">Form not found</div>
+    <h3>@FormDefinition.Name</h3>
+    <div class="form-review-container">
+        <DynamicForm FormDefinition="FormDefinition"
+                     FormData="_formValues"
+                     OnValidSubmit="HandleSubmit" />
+    </div>
 }
 
 @code {
     [Parameter] public string Id { get; set; }
     private FormDefinition FormDefinition { get; set; }
+    private Dictionary<string, object> _formValues = new();
+    private bool _isLoading = true;
 
     protected override async Task OnInitializedAsync()
     {
-        FormDefinition = await FormService.GetFormAsync(Id);
-    }
-
-    private void HandleSubmit(Dictionary<string, object> formData)
-    {
-        Console.WriteLine("Form submitted with data:");
-        foreach (var item in formData)
+        try
         {
-            Console.WriteLine($"{item.Key}: {item.Value}");
+            _isLoading = true;
+        
+            FormDefinition = await FormService.GetFormAsync(Id);
+            if (FormDefinition != null)
+            {
+                // Initialize form values
+                foreach (var field in FormDefinition.Fields)
+                {
+                    _formValues[field.Name] = field.DefaultValue ?? GetDefaultValue(field.Type);
+                }
+            }
+        }
+        catch (Exception)
+        {
+            throw;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+    private void ReturnToBuilder()
+    {
+        Navigation.NavigateTo("/form-builder");
+    }
+    private object GetDefaultValue(FieldType type)
+    {
+        return type switch
+        {
+            FieldType.Number => 0,
+            FieldType.Checkbox => false,
+            FieldType.Date => DateTime.Today,
+            _ => string.Empty
+        };
+    }
+    private async Task HandleSubmit()
+    {
+        try
+        {
+            // Process form submission with _formValues (already populated via two-way binding)
+            Console.WriteLine("Form submitted with values:");
+            foreach (var item in _formValues)
+            {
+                Console.WriteLine($"{item.Key}: {item.Value}");
+            }
+
+            // Example: Send to API
+            // var response = await _httpClient.PostAsJsonAsync("/api/submissions", new {
+            //     FormId = Id,
+            //     Values = _formValues
+            // });
+
+            // Show success message
+            // await _toastService.ShowSuccess("Form submitted successfully!");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Submission error: {ex.Message}");
+            // await _toastService.ShowError("Failed to submit form");
         }
     }
 }

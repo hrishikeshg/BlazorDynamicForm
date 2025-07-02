@@ -9,9 +9,9 @@
         <label>Field Type</label>
         <label>Field Type</label>
         <InputSelect Value="Field.Type"
-                     ValueChanged="@(async (FieldType value) => { Field.Type = value; await OnFieldChanged.InvokeAsync(); })"
-                     ValueExpression="@(() => Field.Type)"
-                     class="form-control">
+        ValueChanged="@(async (FieldType value) => { Field.Type = value; await OnFieldChanged.InvokeAsync(); })"
+        ValueExpression="@(() => Field.Type)"
+        class="form-control">
             @foreach (var type in Enum.GetValues(typeof(FieldType)))
             {
                 <option value="@type">@type</option>
@@ -75,7 +75,89 @@
         </div>
     }
 
-    @if (Field.Type == FieldType.DropDown)
+    @if (Field.Type == FieldType.DropDown || Field.Type == FieldType.CascadingDropDown)
+    {
+        <div class="form-group">
+            <label>
+                <InputCheckbox @bind-Value="IsCascading" />
+                Is Cascading Dropdown
+            </label>
+            @if (IsCascading)
+            {
+                <div class="card p-2 mt-2">
+                    <div class="form-group">
+                        <label>Parent Dropdown</label>
+                        <InputSelect @bind-Value="Field.ParentFieldId" class="form-control">
+                            <option value="">-- Select Parent --</option>
+                            @foreach (var parentField in FormDefinition.Fields
+                       .Where(f => f.Type == FieldType.DropDown && f.Id != Field.Id))
+                            {
+                                <option value="@parentField.Id">@parentField.Label</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group">
+                        <label>Cascading Options</label>
+                        @if (string.IsNullOrEmpty(Field.ParentFieldId))
+                        {
+                            <div class="alert alert-info">
+                                Select a parent dropdown first
+                            </div>
+                        }
+                        else
+                        {
+                            var parentField = FormDefinition.Fields.FirstOrDefault(f => f.Id == Field.ParentFieldId);
+                            if (parentField != null)
+                            {
+                                foreach (var parentOption in parentField.Data)
+                                {
+                                    <div class="mb-3">
+                                        <label>Options when @parentField.Label is '@parentOption.Text'</label>
+                                        <button @onclick="@(() => AddCascadingOption(parentOption.Value))" 
+                                        class="btn btn-sm btn-primary mb-2">
+                                            Add Option
+                                        </button>
+
+                                        @foreach (var item in GetCascadingOptions(parentOption.Value))
+                                        {
+                                            <div class="input-group mb-2">
+                                                <InputText @bind-Value="item.Value" class="form-control" placeholder="Value" />
+                                                <InputText @bind-Value="item.Text" class="form-control" placeholder="Text" />
+                                                <button @onclick="@(() => RemoveCascadingOption(parentOption.Value, item))"
+                                                class="btn btn-danger">
+                                                    &times;
+                                                </button>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
+                        }
+                    </div>
+                </div>
+            }
+            @if (!IsCascading)
+            {
+                <div class="form-group mt-3">
+                    <label>Dropdown Options</label>
+                    @foreach (var item in Field.Data)
+                    {
+                        <div class="input-group mb-2">
+                            <InputText @bind-Value="item.Value" class="form-control" placeholder="Value" />
+                            <InputText @bind-Value="item.Text" class="form-control" placeholder="Text" />
+                            <button @onclick="@(() => RemoveDropdownItem(item))" class="btn btn-danger">
+                                &times;
+                            </button>
+                        </div>
+                    }
+                    <button @onclick="AddDropdownItem" class="btn btn-secondary">
+                        <i class="fas fa-plus"></i> Add Option
+                    </button>
+                </div>
+            }
+        </div>
+    }
+    @* @if (Field.Type == FieldType.DropDown)
     {
         <div class="form-group">
             <label>Dropdown Options</label>
@@ -95,7 +177,7 @@
                 </button>
             </div>
         </div>
-    }
+    } *@
 
     <div class="rules-section mt-4">
         <h5>Rules</h5>
@@ -163,9 +245,36 @@
     [Parameter] public FormDefinition FormDefinition { get; set; }
     [Parameter] public EventCallback OnFieldChanged { get; set; }
 
+    private bool IsCascading
+    {
+        get => Field.Type == FieldType.CascadingDropDown;
+        set => Field.Type = value ? FieldType.CascadingDropDown : FieldType.DropDown;
+    }
+
+    private List<SelectListItem> GetCascadingOptions(string parentValue)
+    {
+        if (!Field.CascadingData.ContainsKey(parentValue))
+        {
+            Field.CascadingData[parentValue] = new List<SelectListItem>();
+        }
+        return Field.CascadingData[parentValue];
+    }
+
+    private void AddCascadingOption(string parentValue)
+    {
+        GetCascadingOptions(parentValue).Add(new SelectListItem());
+        OnFieldChanged.InvokeAsync();
+    }
+
+    private void RemoveCascadingOption(string parentValue, SelectListItem item)
+    {
+        GetCascadingOptions(parentValue).Remove(item);
+        OnFieldChanged.InvokeAsync();
+    }
+
     private void AddDropdownItem()
     {
-        Field.Data.Add(new SelectListItem { Value = "option", Text = "Option" });
+        Field.Data.Add(new SelectListItem());
         OnFieldChanged.InvokeAsync();
     }
 

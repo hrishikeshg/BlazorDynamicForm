@@ -1,4 +1,6 @@
-﻿namespace DynamicForm.Helper;
+﻿using DynamicForm.Models;
+
+namespace DynamicForm.Helper;
 
 public class DynamicFieldWrapper
 {
@@ -16,4 +18,26 @@ public class DynamicFieldWrapper
         get => _values.TryGetValue(_fieldName, out var value) ? value?.ToString() : null;
         set => _values[_fieldName] = value;
     }
+
+    // Number value
+    public int? NumberValue
+    {
+        get => _values.TryGetValue(_fieldName, out var value) && int.TryParse(value?.ToString(), out var num) ? num : null;
+        set => _values[_fieldName] = value;
+    }
+
+    // Boolean value
+    public bool BooleanValue
+    {
+        get => _values.TryGetValue(_fieldName, out var value) && bool.TryParse(value?.ToString(), out var b) && b;
+        set => _values[_fieldName] = value;
+    }
+
+    // Date value
+    public DateTime? DateValue
+    {
+        get => _values.TryGetValue(_fieldName, out var value) && DateTime.TryParse(value?.ToString(), out var date) ? date : null;
+        set => _values[_fieldName] = value;
+    }
+    public List<SelectListItem> Options { get; set; } = new();
 }
