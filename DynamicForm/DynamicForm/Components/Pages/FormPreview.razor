@@ -2,7 +2,9 @@
 @using DynamicForm.Models
 @using DynamicForm.Services
 @inject IFormService FormService
+@inject FormStateService FormStateService
 @inject NavigationManager Navigation
+@rendermode InteractiveServer
 <h3>Form Review: @FormDefinition?.Name</h3>
 @if (_isLoading)
 {
@@ -26,8 +28,8 @@ else
     <h3>@FormDefinition.Name</h3>
     <div class="form-review-container">
         <DynamicForm FormDefinition="FormDefinition"
-                     FormData="_formValues"
-                     OnValidSubmit="HandleSubmit" />
+                     FormData="_formValues"                     
+                     OnValidSubmit="HandleValidSubmit" />
     </div>
 }
 
@@ -36,31 +38,72 @@ else
     private FormDefinition FormDefinition { get; set; }
     private Dictionary<string, object> _formValues = new();
     private bool _isLoading = true;
+    private bool _isInitialized = false;
 
     protected override async Task OnInitializedAsync()
     {
-        try
+        if (!_isInitialized)
         {
-            _isLoading = true;
-        
-            FormDefinition = await FormService.GetFormAsync(Id);
-            if (FormDefinition != null)
+            try
             {
-                // Initialize form values
-                foreach (var field in FormDefinition.Fields)
+                _isLoading = true;
+                // // Check for existing state first
+                // var savedState = FormStateService.GetFormState(Id);
+                // if (savedState != null)
+                // {
+                //     _formValues = savedState;
+                // }
+
+                // FormDefinition = await FormService.GetFormAsync(Id);
+
+                // if (FormDefinition != null)
+                // {
+                //     foreach (var field in FormDefinition.Fields)
+                //     {
+                //         _formValues[field.Name] = field.DefaultValue ?? GetDefaultValue(field.Type);
+                //     }
+                // }
+
+                FormDefinition = await FormService.GetFormAsync(Id);
+                if (FormDefinition != null)
                 {
-                    _formValues[field.Name] = field.DefaultValue ?? GetDefaultValue(field.Type);
+                    // Initialize only if empty
+                    if (_formValues.Count == 0)
+                    {
+                        foreach (var field in FormDefinition.Fields)
+                        {
+                            _formValues[field.Name] = field.DefaultValue ?? GetDefaultValue(field.Type);
+                        }
+                    }
                 }
             }
+            finally
+            {
+                _isLoading = false;
+                _isInitialized = true;
+            }
         }
-        catch (Exception)
+    }
+    private async Task HandleFormSubmit(EventArgs e)
+    {
+        // Prevent default
+        // await Task.CompletedTask;
+
+        // Console.WriteLine("Form submitted with values:");
+        // foreach (var item in _formValues)
+        // {
+        //     Console.WriteLine($"{item.Key}: {item.Value}");
+        // }
+
+        var submittedValues = new Dictionary<string, object>(_formValues);
+
+        Console.WriteLine("Form submitted with values:");
+        foreach (var item in submittedValues)
         {
-            throw;
+            Console.WriteLine($"{item.Key}: {item.Value}");
         }
-        finally
-        {
-            _isLoading = false;
-        }
+
+        // Your submission logic
     }
     private void ReturnToBuilder()
     {
@@ -76,25 +119,21 @@ else
             _ => string.Empty
         };
     }
-    private async Task HandleSubmit()
+    private async Task HandleValidSubmit(Dictionary<string, object> submittedValues)
     {
         try
         {
-            // Process form submission with _formValues (already populated via two-way binding)
             Console.WriteLine("Form submitted with values:");
-            foreach (var item in _formValues)
+            foreach (var item in submittedValues)
             {
                 Console.WriteLine($"{item.Key}: {item.Value}");
             }
 
-            // Example: Send to API
-            // var response = await _httpClient.PostAsJsonAsync("/api/submissions", new {
-            //     FormId = Id,
-            //     Values = _formValues
-            // });
+            // Your submission logic here
+            // await _httpClient.PostAsJsonAsync("/api/submit", submittedValues);
 
-            // Show success message
-            // await _toastService.ShowSuccess("Form submitted successfully!");
+            // Update local values if needed
+            _formValues = new Dictionary<string, object>(submittedValues);
         }
         catch (Exception ex)
         {

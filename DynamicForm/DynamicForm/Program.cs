@@ -13,6 +13,7 @@ builder.Services.AddServerSideBlazor()
 
 builder.Services.AddScoped<IFormService, FormService>();
 builder.Services.AddScoped<FormBuilderState>();
+builder.Services.AddScoped<FormStateService>();
 
 var app = builder.Build();
 

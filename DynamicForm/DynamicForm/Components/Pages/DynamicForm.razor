@@ -7,7 +7,9 @@
 @typeparam TItem
 @inherits OwningComponentBase<FormService>
 
-<EditForm Model="@FormValues" FormName="@GetFormName()" OnValidSubmit="@HandleValidSubmit">
+<EditForm Model="@FormValues" 
+            FormName="@GetFormName()"            
+            OnValidSubmit="@(() => HandleValidSubmitInternal())">
     <CustomValidator @ref="_validator" Fields="@FormDefinition.Fields" />
     <ValidationSummary />
     @foreach (var field in FormDefinition.Fields)
@@ -27,12 +29,17 @@
                 @switch (field.Type)
                 {
                     case FieldType.Text:
-                        <InputText @bind-Value="wrapper.Value"
+                        <InputText Value="@wrapper.Value"
+                                   ValueChanged="@(async (value) => { wrapper.Value = value; await HandleValueChanged(field, value); })"
+                                   ValueExpression="@(() => wrapper.Value)"
                                    class="form-control"
                                    disabled="@field.IsReadonly" />
                         break;
                     case FieldType.Number:
-                        <InputNumber @bind-Value="wrapper.NumberValue"
+                        <InputNumber TValue="int?"
+                                     Value="@wrapper.NumberValue"
+                                     ValueChanged="@(async (value) => await HandleNumberValueChanged(field, wrapper, value))"
+                                     ValueExpression="@(() => wrapper.NumberValue)"
                                      class="form-control"
                                      disabled="@field.IsReadonly" />
                         break;
@@ -76,8 +83,9 @@
     [Parameter] public FormDefinition FormDefinition { get; set; }
     [Parameter] public TItem FormData { get; set; }
     [Parameter] public EventCallback<TItem> FormDataChanged { get; set; }
-    [Parameter] public EventCallback OnValidSubmit { get; set; }
+    [Parameter] public EventCallback<Dictionary<string, object>> OnValidSubmit { get; set; }
     
+
     private CustomValidator _validator;
     private Dictionary<string, object> FormValues = new();
     private FormFieldModel WorkingModel;
@@ -95,6 +103,40 @@
                 FormValues[field.Name] = GetInitialValue(field);
             }
         }
+        foreach (var field in FormDefinition.Fields)
+        {
+            EvaluateRules(field.Id).GetAwaiter().GetResult();
+        }
+    }
+   
+    private async Task HandleNumberValueChanged(FormField field, DynamicFieldWrapper wrapper, int? value)
+    {
+        // Update wrapper value
+        wrapper.NumberValue = value;
+
+        // Update FormValues dictionary
+        FormValues[field.Name] = value;
+
+        // Update the actual model if bound
+        if (FormData != null)
+        {
+            if (FormData is Dictionary<string, object> dict)
+            {
+                dict[field.Name] = value;
+            }
+            else
+            {
+                var prop = typeof(TItem).GetProperty(field.Name);
+                if (prop != null)
+                {
+                    prop.SetValue(FormData, value);
+                }
+            }
+            await FormDataChanged.InvokeAsync(FormData);
+        }
+
+        // Trigger rules evaluation
+        await EvaluateRules(field.Id);
     }
     private string GetFormName()
     {
@@ -301,49 +343,29 @@
         catch (Exception ex)
         {
             Console.WriteLine($"Error in HandleValueChanged: {ex.Message}");
-        }
-        // FormValues[field.Name] = value;
-
-        // // Evaluate rules for this field
-        // await EvaluateRules(field.Id);
-
-        // // Update the form data object
-        // if (FormData is Dictionary<string, object> dict)
-        // {
-        //     dict[field.Name] = value;
-        // }
-        // else
-        // {
-        //     var prop = typeof(TItem).GetProperty(field.Name);
-        //     if (prop != null)
-        //     {
-        //         prop.SetValue(FormData, Convert.ChangeType(value, prop.PropertyType));
-        //     }
-        // }
-
-        // StateHasChanged();
+        }        
     }
-
     private async Task EvaluateRules(string sourceFieldId)
     {
-        var rules = FormDefinition.Fields
-            .SelectMany(f => f.Rules)
-            .Where(r => r.TargetFieldId == sourceFieldId)
-            .ToList();
+        // Find the source field (the one that just changed)
+        var sourceField = FormDefinition.Fields.FirstOrDefault(f => f.Id == sourceFieldId);
+        if (sourceField == null)
+            return;
 
-        foreach (var rule in rules)
+        // For each rule defined on the source field
+        foreach (var rule in sourceField.Rules)
         {
-            var sourceField = FormDefinition.Fields.First(f => f.Id == sourceFieldId);
-            var targetField = FormDefinition.Fields.First(f => f.Id == rule.TargetFieldId);
+            // Find the target field to apply actions to
+            var targetField = FormDefinition.Fields.FirstOrDefault(f => f.Id == rule.TargetFieldId);
+            if (targetField == null)
+                continue;
 
-            var sourceValue = FormValues.TryGetValue(sourceField.Name, out var val) ? val?.ToString() : null;
             // Get the current value of the source field
-            //var conditionMet = EvaluateCondition(sourceField, rule.Condition);
-            // var conditionMet = string.IsNullOrEmpty(rule.Condition) ||
-            //              EvaluateCondition(rule.Condition, FormValues[sourceFieldId]?.ToString());
+            var sourceValue = FormValues.TryGetValue(sourceField.Name, out var val) ? val?.ToString() : null;
 
+            // Check if the rule's condition is met
             var conditionMet = string.IsNullOrEmpty(rule.Condition) ||
-                         EvaluateCondition(sourceField, sourceValue, rule.Condition);
+                               EvaluateCondition(sourceField, sourceValue, rule.Condition);
 
             if (conditionMet)
             {
@@ -369,19 +391,71 @@
                         case "setRequired":
                             targetField.IsRequired = Convert.ToBoolean(action.Value);
                             break;
-                        case "loadOptions":
-                            if (targetField.Type == FieldType.DropDown ||
-                            targetField.Type == FieldType.CascadingDropDown)
-                            {
-                                await UpdateDropdownOptions(sourceField, targetField, sourceValue);
-                            }
-                            break;
                     }
                 }
             }
         }
         StateHasChanged();
     }
+
+    // private async Task EvaluateRules(string sourceFieldId)
+    // {
+    //     var rules = FormDefinition.Fields
+    //         .SelectMany(f => f.Rules)
+    //         .Where(r => r.TargetFieldId == sourceFieldId)
+    //         .ToList();
+
+    //     foreach (var rule in rules)
+    //     {
+    //         var sourceField = FormDefinition.Fields.First(f => f.Id == sourceFieldId);
+    //         var targetField = FormDefinition.Fields.First(f => f.Id == rule.TargetFieldId);
+
+    //         var sourceValue = FormValues.TryGetValue(sourceField.Name, out var val) ? val?.ToString() : null;
+    //         // Get the current value of the source field
+    //         //var conditionMet = EvaluateCondition(sourceField, rule.Condition);
+    //         // var conditionMet = string.IsNullOrEmpty(rule.Condition) ||
+    //         //              EvaluateCondition(rule.Condition, FormValues[sourceFieldId]?.ToString());
+
+    //         var conditionMet = string.IsNullOrEmpty(rule.Condition) ||
+    //                      EvaluateCondition(sourceField, sourceValue, rule.Condition);
+
+    //         if (conditionMet)
+    //         {
+    //             foreach (var action in rule.Actions)
+    //             {
+    //                 switch (action.Type)
+    //                 {
+    //                     case "show":
+    //                         targetField.IsHidden = false;
+    //                         break;
+    //                     case "hide":
+    //                         targetField.IsHidden = true;
+    //                         break;
+    //                     case "enable":
+    //                         targetField.IsReadonly = false;
+    //                         break;
+    //                     case "disable":
+    //                         targetField.IsReadonly = true;
+    //                         break;
+    //                     case "setValue":
+    //                         FormValues[targetField.Name] = action.Value;
+    //                         break;
+    //                     case "setRequired":
+    //                         targetField.IsRequired = Convert.ToBoolean(action.Value);
+    //                         break;
+    //                     case "loadOptions":
+    //                         if (targetField.Type == FieldType.DropDown ||
+    //                         targetField.Type == FieldType.CascadingDropDown)
+    //                         {
+    //                             await UpdateDropdownOptions(sourceField, targetField, sourceValue);
+    //                         }
+    //                         break;
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     StateHasChanged();
+    // }
     private bool EvaluateCondition(FormField sourceField, string sourceValue, string condition)
     {
         if (string.IsNullOrEmpty(condition)) return true;
@@ -470,12 +544,24 @@
         await EvaluateRules(field.Id);
         StateHasChanged();
     }
-    private async Task HandleValidSubmit()
+    private async Task HandleValidSubmitInternal()
     {
-        if (_validator?.Validate() ?? false)
-        {
-            await OnValidSubmit.InvokeAsync();
-            //await OnValidSubmit.InvokeAsync(FormData);
-        }        
+
+        var submittedValues = new Dictionary<string, object>(FormValues);
+        // Invoke the parent's handler with the cloned values
+        await OnValidSubmit.InvokeAsync(submittedValues);
     }
+
+    private Dictionary<string, object> ConvertToDictionary(TItem obj)
+    {
+        var dict = new Dictionary<string, object>();
+        if (obj != null)
+        {
+            foreach (var prop in typeof(TItem).GetProperties())
+            {
+                dict[prop.Name] = prop.GetValue(obj);
+            }
+        }
+        return dict;
+    }    
 }
