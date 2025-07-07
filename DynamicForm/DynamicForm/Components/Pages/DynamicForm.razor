@@ -102,6 +102,11 @@
             {
                 FormValues[field.Name] = GetInitialValue(field);
             }
+            // Store original state
+            field.OriginalIsHidden = field.IsHidden;
+            field.OriginalIsReadonly = field.IsReadonly;
+            field.OriginalIsRequired = field.IsRequired;
+            field.OriginalValue = FormValues[field.Name];
         }
         foreach (var field in FormDefinition.Fields)
         {
@@ -394,6 +399,30 @@
                     }
                 }
             }
+            else
+            {
+                // Revert to original state if condition is not met
+                foreach (var action in rule.Actions)
+                {
+                    switch (action.Type)
+                    {
+                        case "show":
+                        case "hide":
+                            targetField.IsHidden = targetField.OriginalIsHidden;
+                            break;
+                        case "enable":
+                        case "disable":
+                            targetField.IsReadonly = targetField.OriginalIsReadonly;
+                            break;
+                        case "setValue":
+                            FormValues[targetField.Name] = targetField.OriginalValue;
+                            break;
+                        case "setRequired":
+                            targetField.IsRequired = targetField.OriginalIsRequired;
+                            break;
+                    }
+                }
+            }
         }
         StateHasChanged();
     }
@@ -546,7 +575,7 @@
     }
     private async Task HandleValidSubmitInternal()
     {
-
+        //_validator?.Validate();
         var submittedValues = new Dictionary<string, object>(FormValues);
         // Invoke the parent's handler with the cloned values
         await OnValidSubmit.InvokeAsync(submittedValues);

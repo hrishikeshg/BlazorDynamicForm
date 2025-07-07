@@ -29,6 +29,11 @@ public class FormField
     public string ParentFieldId { get; set; }
     public Dictionary<string, List<SelectListItem>> CascadingData { get; set; } = new();
     public List<FieldRule> Rules { get; set; } = new();
+
+    public bool OriginalIsHidden { get; set; }
+    public bool OriginalIsReadonly { get; set; }
+    public bool OriginalIsRequired { get; set; }
+    public object OriginalValue { get; set; }
 }
 
 public class FieldRule
