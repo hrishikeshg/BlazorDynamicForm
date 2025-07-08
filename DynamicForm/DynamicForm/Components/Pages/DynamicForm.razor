@@ -44,18 +44,26 @@
                                      disabled="@field.IsReadonly" />
                         break;
                     case FieldType.Checkbox:
-                        <InputCheckbox @bind-Value="wrapper.BooleanValue"
+                        <InputCheckbox TValue="bool"
+                                       Value="@wrapper.BooleanValue"
+                                       ValueChanged="@(async (value) => { wrapper.BooleanValue = value; await HandleValueChanged(field, value); })"
+                                       ValueExpression="@(() => wrapper.BooleanValue)"
                                        class="form-check-input"
                                        disabled="@field.IsReadonly" />
                         break;
 
                     case FieldType.Date:
-                        <InputDate @bind-Value="wrapper.DateValue"
+                        <InputDate TValue="DateTime?"
+                                   Value="@wrapper.DateValue"
+                                   ValueChanged="@(async (value) => { wrapper.DateValue = value; await HandleValueChanged(field, value); })"
+                                   ValueExpression="@(() => wrapper.DateValue)"
                                    class="form-control"
                                    disabled="@field.IsReadonly" />
                         break;
                     case FieldType.DropDown:
-                        <InputSelect @bind-Value="wrapper.Value"
+                        <InputSelect Value="@wrapper.Value"
+                                     ValueChanged="@(async (string value) => { wrapper.Value = value; await HandleValueChanged(field, value); })"
+                                     ValueExpression="@(() => wrapper.Value)"
                                      class="form-control"
                                      disabled="@field.IsReadonly">
                             <option value="">-- Select --</option>
@@ -66,9 +74,17 @@
                         </InputSelect>
                         break;
                     case FieldType.CascadingDropDown:
-                        <CascadingDropDown Field="@field"
-                                           FormValues="@FormValues"
-                                           FormDefinition="@FormDefinition" />
+                        <InputSelect Value="@wrapper.Value"
+                                     ValueChanged="@(async (string value) => { wrapper.Value = value; await HandleValueChanged(field, value); })"
+                                     ValueExpression="@(() => wrapper.Value)"
+                                     class="form-control"
+                                     disabled="@field.IsReadonly">
+                            <option value="">-- Select --</option>
+                            @foreach (var item in wrapper.Options)
+                            {
+                                <option value="@item.Value">@item.Text</option>
+                            }
+                        </InputSelect>
                         break;
                 }
 
@@ -395,6 +411,13 @@
                             break;
                         case "setRequired":
                             targetField.IsRequired = Convert.ToBoolean(action.Value);
+                            break;
+                        case "loadOptions":
+                            if (targetField.Type == FieldType.DropDown ||
+                            targetField.Type == FieldType.CascadingDropDown)
+                            {
+                                await UpdateDropdownOptions(sourceField, targetField, sourceValue);
+                            }
                             break;
                     }
                 }
