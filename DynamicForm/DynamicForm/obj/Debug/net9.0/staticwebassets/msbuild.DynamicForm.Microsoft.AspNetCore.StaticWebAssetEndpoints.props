@@ -16,13 +16,13 @@
       <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\DynamicForm.k0qb0y3mm8.bundle.scp.css'))</AssetFile>
       <Selectors><![CDATA[[]]]></Selectors>
       <EndpointProperties><![CDATA[[{"Name":"integrity","Value":"sha256-dNA\u002BYSFdohZ5vsJYvzQQTJQYn\u002BcDlTTD3FY7jt5YmFw="}]]]></EndpointProperties>
-      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"no-cache"},{"Name":"Content-Length","Value":"5969"},{"Name":"Content-Type","Value":"text/css"},{"Name":"ETag","Value":"\u0022dNA\u002BYSFdohZ5vsJYvzQQTJQYn\u002BcDlTTD3FY7jt5YmFw=\u0022"},{"Name":"Last-Modified","Value":"Wed, 02 Jul 2025 04:49:24 GMT"}]]]></ResponseHeaders>
+      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"no-cache"},{"Name":"Content-Length","Value":"5969"},{"Name":"Content-Type","Value":"text/css"},{"Name":"ETag","Value":"\u0022dNA\u002BYSFdohZ5vsJYvzQQTJQYn\u002BcDlTTD3FY7jt5YmFw=\u0022"},{"Name":"Last-Modified","Value":"Wed, 09 Jul 2025 09:57:43 GMT"}]]]></ResponseHeaders>
     </StaticWebAssetEndpoint>
     <StaticWebAssetEndpoint Include="_content/DynamicForm/DynamicForm.k0qb0y3mm8.bundle.scp.css">
       <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\DynamicForm.k0qb0y3mm8.bundle.scp.css'))</AssetFile>
       <Selectors><![CDATA[[]]]></Selectors>
       <EndpointProperties><![CDATA[[{"Name":"fingerprint","Value":"k0qb0y3mm8"},{"Name":"integrity","Value":"sha256-dNA\u002BYSFdohZ5vsJYvzQQTJQYn\u002BcDlTTD3FY7jt5YmFw="},{"Name":"label","Value":"_content/DynamicForm/DynamicForm.bundle.scp.css"}]]]></EndpointProperties>
-      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"max-age=31536000, immutable"},{"Name":"Content-Length","Value":"5969"},{"Name":"Content-Type","Value":"text/css"},{"Name":"ETag","Value":"\u0022dNA\u002BYSFdohZ5vsJYvzQQTJQYn\u002BcDlTTD3FY7jt5YmFw=\u0022"},{"Name":"Last-Modified","Value":"Wed, 02 Jul 2025 04:49:24 GMT"}]]]></ResponseHeaders>
+      <ResponseHeaders><![CDATA[[{"Name":"Accept-Ranges","Value":"bytes"},{"Name":"Cache-Control","Value":"max-age=31536000, immutable"},{"Name":"Content-Length","Value":"5969"},{"Name":"Content-Type","Value":"text/css"},{"Name":"ETag","Value":"\u0022dNA\u002BYSFdohZ5vsJYvzQQTJQYn\u002BcDlTTD3FY7jt5YmFw=\u0022"},{"Name":"Last-Modified","Value":"Wed, 09 Jul 2025 09:57:43 GMT"}]]]></ResponseHeaders>
     </StaticWebAssetEndpoint>
     <StaticWebAssetEndpoint Include="_content/DynamicForm/favicon.ifv42okdf2.png">
       <AssetFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\favicon.png'))</AssetFile>

@@ -47,23 +47,7 @@ else
             try
             {
                 _isLoading = true;
-                // // Check for existing state first
-                // var savedState = FormStateService.GetFormState(Id);
-                // if (savedState != null)
-                // {
-                //     _formValues = savedState;
-                // }
-
-                // FormDefinition = await FormService.GetFormAsync(Id);
-
-                // if (FormDefinition != null)
-                // {
-                //     foreach (var field in FormDefinition.Fields)
-                //     {
-                //         _formValues[field.Name] = field.DefaultValue ?? GetDefaultValue(field.Type);
-                //     }
-                // }
-
+                
                 FormDefinition = await FormService.GetFormAsync(Id);
                 if (FormDefinition != null)
                 {
@@ -86,15 +70,6 @@ else
     }
     private async Task HandleFormSubmit(EventArgs e)
     {
-        // Prevent default
-        // await Task.CompletedTask;
-
-        // Console.WriteLine("Form submitted with values:");
-        // foreach (var item in _formValues)
-        // {
-        //     Console.WriteLine($"{item.Key}: {item.Value}");
-        // }
-
         var submittedValues = new Dictionary<string, object>(_formValues);
 
         Console.WriteLine("Form submitted with values:");
