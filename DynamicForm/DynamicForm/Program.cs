@@ -14,6 +14,7 @@ builder.Services.AddServerSideBlazor()
 builder.Services.AddScoped<IFormService, FormService>();
 builder.Services.AddScoped<FormBuilderState>();
 builder.Services.AddScoped<FormStateService>();
+builder.Services.AddScoped<FormSubmissionService>();
 
 var app = builder.Build();
 

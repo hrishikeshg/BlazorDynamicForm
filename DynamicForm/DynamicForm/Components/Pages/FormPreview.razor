@@ -3,6 +3,7 @@
 @using DynamicForm.Services
 @inject IFormService FormService
 @inject FormStateService FormStateService
+@inject FormSubmissionService SubmissionService
 @inject NavigationManager Navigation
 @rendermode InteractiveServer
 <h3>Form Review: @FormDefinition?.Name</h3>
@@ -104,8 +105,8 @@ else
                 Console.WriteLine($"{item.Key}: {item.Value}");
             }
 
-            // Your submission logic here
-            // await _httpClient.PostAsJsonAsync("/api/submit", submittedValues);
+            // Save the submission
+            await SaveSubmissionAsync(FormDefinition, submittedValues);
 
             // Update local values if needed
             _formValues = new Dictionary<string, object>(submittedValues);
@@ -115,5 +116,15 @@ else
             Console.WriteLine($"Submission error: {ex.Message}");
             // await _toastService.ShowError("Failed to submit form");
         }
+    }
+    public async Task SaveSubmissionAsync(FormDefinition form, Dictionary<string, object> fieldValues)
+    {
+        var submission = new FormSubmission
+            {
+                FormDefinitionId = form.Id,
+                FieldValues = fieldValues
+            };
+        SubmissionService.AddSubmission(submission);
+        await Task.CompletedTask;
     }
 }

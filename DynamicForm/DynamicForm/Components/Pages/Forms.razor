@@ -1,0 +1,125 @@
+﻿@page "/forms"
+@using DynamicForm.Models
+@using DynamicForm.Services
+@inject IFormService FormService
+@inject FormSubmissionService SubmissionService
+@rendermode InteractiveServer
+<h3>Forms</h3>
+<ModalDialog IsOpen="@IsModalOpen" Title="Edit Submission" OnClose="CloseModal">
+    @if (IsModalOpen && SelectedForm != null && EditValues != null)
+    {
+        <DynamicForm FormDefinition="SelectedForm"
+                     FormData="EditValues"
+                     OnValidSubmit="OnEditSubmit" />
+    }
+</ModalDialog>
+<select @onchange="OnFormSelected" class="form-select">
+    <option value="">-- Select Form --</option>
+    @foreach (var form in AllForms)
+    {
+        <option value="@form.Id">@form.Name</option>
+    }
+</select>
+
+@if (SelectedForm != null)
+{
+    <h4>Submissions for: @SelectedForm.Name</h4>
+    <table class="table">
+        <thead>
+            <tr>
+                @foreach (var field in SelectedForm.Fields)
+                {
+                    <th>@field.Label</th>
+                }
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var submission in Submissions)
+            {
+                <tr>
+                    @foreach (var field in SelectedForm.Fields)
+                    {
+                        <td>@(submission.FieldValues.TryGetValue(field.Name, out var value) ? value : "")</td>
+                    }
+                    <td>
+                        <button class="btn btn-primary btn-sm" @onclick="() => EditSubmission(submission.Id)">Edit</button>
+                        <button class="btn btn-danger btn-sm" @onclick="() => DeleteSubmission(submission.Id)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<FormDefinition> AllForms = new();
+    private FormDefinition SelectedForm;
+    private IReadOnlyList<FormSubmission> Submissions = Array.Empty<FormSubmission>();
+    private bool IsModalOpen = false;
+    private Dictionary<string, object> EditValues;
+    private string EditingSubmissionId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AllForms = await FormService.GetAllFormsAsync();
+    }
+
+    private void OnFormSelected(ChangeEventArgs e)
+    {
+        var formId = e.Value?.ToString();
+        SelectedForm = AllForms.FirstOrDefault(f => f.Id == formId);
+        if (SelectedForm != null)
+        {
+            Submissions = SubmissionService.GetSubmissionsByFormId(formId);
+        }
+        else
+        {
+            Submissions = Array.Empty<FormSubmission>();
+        }
+    }
+
+    private void EditSubmission(string submissionId)
+    {
+        var submission = Submissions.FirstOrDefault(s => s.Id == submissionId);
+        if (submission != null)
+        {
+            // Clone values to avoid editing the grid directly
+            EditValues = new Dictionary<string, object>(submission.FieldValues);
+            EditingSubmissionId = submissionId;
+            IsModalOpen = true;
+        }
+    }
+
+    private void CloseModal()
+    {
+        IsModalOpen = false;
+        EditValues = null;
+        EditingSubmissionId = null;
+    }
+
+    private async Task OnEditSubmit(Dictionary<string, object> updatedValues)
+    {
+        // Update the submission in your service
+        SubmissionService.UpdateSubmission(new FormSubmission
+            {
+                Id = EditingSubmissionId,
+                FormDefinitionId = SelectedForm.Id,
+                FieldValues = updatedValues,
+                SubmittedAt = DateTime.UtcNow
+            });
+
+        // Refresh grid
+        Submissions = SubmissionService.GetSubmissionsByFormId(SelectedForm.Id);
+        CloseModal();
+        await Task.CompletedTask;
+    }
+    private void DeleteSubmission(string submissionId)
+    {
+        //SubmissionService.DeleteSubmission(submissionId);
+        if (SelectedForm != null)
+        {
+            Submissions = SubmissionService.GetSubmissionsByFormId(SelectedForm.Id);
+        }
+    }
+}

@@ -81,3 +81,14 @@ public class FormFieldModel
         set => _values[fieldName] = value;
     }
 }
+
+public class FormSubmission
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string FormDefinitionId { get; set; }  // Link to FormDefinition
+    public Dictionary<string, object> FieldValues { get; set; } = new();
+    public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
+    public string SubmittedBy { get; set; }  // Optional: User ID/email
+
+    //public FormDefinition FormDefinition { get; set; }
+}
