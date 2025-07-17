@@ -15,6 +15,7 @@ builder.Services.AddScoped<IFormService, FormService>();
 builder.Services.AddScoped<FormBuilderState>();
 builder.Services.AddScoped<FormStateService>();
 builder.Services.AddScoped<FormSubmissionService>();
+builder.Services.AddScoped<RuleEngineService>();
 
 var app = builder.Build();
 

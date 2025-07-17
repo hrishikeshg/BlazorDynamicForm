@@ -157,27 +157,7 @@
             }
         </div>
     }
-    @* @if (Field.Type == FieldType.DropDown)
-    {
-        <div class="form-group">
-            <label>Dropdown Options</label>
-            <div class="dropdown-options-list">
-                @foreach (var item in Field.Data)
-                {
-                    <div class="input-group mb-2">
-                        <InputText @bind-Value="item.Value" class="form-control" placeholder="Value" />
-                        <InputText @bind-Value="item.Text" class="form-control" placeholder="Display Text" />
-                        <button @onclick="@(() => RemoveDropdownItem(item))" class="btn btn-danger">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                }
-                <button @onclick="AddDropdownItem" class="btn btn-secondary">
-                    <i class="fas fa-plus"></i> Add Option
-                </button>
-            </div>
-        </div>
-    } *@
+    
 
     <div class="rules-section mt-4">
         <h5>Rules</h5>

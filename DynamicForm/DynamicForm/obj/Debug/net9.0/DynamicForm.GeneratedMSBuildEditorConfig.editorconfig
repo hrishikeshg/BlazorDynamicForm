@@ -72,6 +72,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xTaGFyZWRcQ3VzdG9tVmFsaWRhdG9yLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/hrish/source/repos/BlazorDynamicForm/DynamicForm/DynamicForm/Components/Shared/DynamicField.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xTaGFyZWRcRHluYW1pY0ZpZWxkLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/hrish/source/repos/BlazorDynamicForm/DynamicForm/DynamicForm/Components/Shared/FieldEditor.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xTaGFyZWRcRmllbGRFZGl0b3IucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
